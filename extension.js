@@ -9,12 +9,12 @@ global.STATUS_TIMEOUT = 3000;
 function activate(context) {
   var syncHelper, currentConfig;
   var ftpConfig = require("./modules/ftp-config");
-  var getSyncHelper = function() {
+  var getSyncHelper = function(workspaceFolder) {
     var oldConfig = currentConfig;
-    currentConfig = ftpConfig.getSyncConfig();
+    currentConfig = ftpConfig.getSyncConfig(workspaceFolder);
 
     if (!syncHelper) syncHelper = require("./modules/sync-helper")();
-    else if (ftpConfig.connectionChanged(oldConfig)) syncHelper.disconnect();
+    else if (ftpConfig.connectionChanged(oldConfig,workspaceFolder)) syncHelper.disconnect();
 
     syncHelper.useConfig(currentConfig);
 
@@ -23,25 +23,9 @@ function activate(context) {
 
   var initCommand = vscode.commands.registerCommand(
     "extension.ftpsyncinit",
-    require("./modules/init-command")
-  );
-  var syncCommand = vscode.commands.registerCommand(
-    "extension.ftpsyncupload",
-    function() {
-      require("./modules/sync-command")(true, getSyncHelper);
-    }
-  );
-  var downloadCommand = vscode.commands.registerCommand(
-    "extension.ftpsyncdownload",
-    function() {
-      require("./modules/sync-command")(false, getSyncHelper);
-    }
-  );
-  var commitCommand = vscode.commands.registerCommand(
-    "extension.ftpsynccommit",
-    function() {
-      require("./modules/commit-command")(getSyncHelper);
-    }
+    function(fileUrl){
+		require("./modules/init-command")(fileUrl.workspaceFolder);
+	}
   );
   var singleCommand = vscode.commands.registerTextEditorCommand(
     "extension.ftpsyncsingle",
@@ -68,40 +52,17 @@ function activate(context) {
     }
   );
   var onSave = require("./modules/on-save");
-  var onGenerate = require("./modules/on-generate");
-
-  var currentConfig = getSyncHelper().getConfig();
-  if (currentConfig.generatedFiles.extensionsToInclude.length > 0) {
-    fsw = vscode.workspace.createFileSystemWatcher(
-      currentConfig.getGeneratedDir() + "/**"
-    );
-    fsw.onDidChange(function(ev) {
-      //an attempt to normalize onDidChange with onDidSaveTextDocument.
-      ev["uri"] = { fsPath: ev.fsPath };
-      onGenerate(ev, getSyncHelper);
-    });
-    fsw.onDidCreate(function(ev) {
-      ev["uri"] = { fsPath: ev.fsPath };
-      onGenerate(ev, getSyncHelper);
-    });
-    fsw.onDidDelete(function(ev) {
-      ev["uri"] = { fsPath: ev.fsPath };
-      onGenerate(ev, getSyncHelper);
-    });
-  }
-
   vscode.workspace.onDidSaveTextDocument(function(file) {
     onSave(file, getSyncHelper);
   });
 
-  context.subscriptions.push(initCommand);
-  context.subscriptions.push(syncCommand);
-  context.subscriptions.push(downloadCommand);
-  context.subscriptions.push(commitCommand);
-  context.subscriptions.push(singleCommand);
-  context.subscriptions.push(uploadcurrentCommand);
-  context.subscriptions.push(downloadcurrentCommand);
-  context.subscriptions.push(listcurrentCommand);
+  // context.subscriptions.push(initCommand);
+  // context.subscriptions.push(syncCommand);
+  // context.subscriptions.push(downloadCommand);
+  // context.subscriptions.push(singleCommand);
+  // context.subscriptions.push(uploadcurrentCommand);
+  // context.subscriptions.push(downloadcurrentCommand);
+  // context.subscriptions.push(listcurrentCommand);
 }
 
 exports.activate = activate;

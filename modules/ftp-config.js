@@ -5,20 +5,21 @@ var _ = require("lodash");
 var upath = require("upath");
 
 module.exports = {
-  rootPath: function() {
-    return vscode.workspace.workspaceFolders[0].uri;
+  DEBUG:false,
+  rootPath: function(wsFolder) {
+    return wsFolder.uri;
   },
-  getConfigPath: function() {
-    return this.getConfigDir() + "/ftp-sync.json";
+  getConfigPath: function(wsFolder) {
+    return this.getConfigDir(wsFolder) + "/ftp-sync.json";
   },
-  getConfigDir: function() {
-    return this.rootPath().fsPath + "/.vscode";
+  getConfigDir: function(wsFolder) {
+    return this.rootPath(wsFolder).fsPath + "/.ftp";
   },
-  getGeneratedDir: function() {
-    return upath.join(this.rootPath().fsPath, this.generatedFiles.path);
+  getGeneratedDir: function(wsFolder) {
+    return upath.join(this.rootPath(wsFolder).fsPath, this.generatedFiles.path);
   },
   defaultConfig: {
-    remotePath: "./",
+    remotePath: "/",
     host: "host",
     username: "username",
     password: "password",
@@ -32,44 +33,46 @@ module.exports = {
     passphrase: null,
     agent: null,
     allow: [],
-    ignore: ["\\.vscode", "\\.git", "\\.DS_Store"],
+    ignore: ["\\.ftp", "\\.git", "\\.DS_Store"],
     generatedFiles: {
       extensionsToInclude: [],
       path: ""
     }
   },
-  getConfig: function() {
-    var configjson = fs.readFileSync(this.getConfigPath()).toString();
-    var configObject;
+  getConfig: function(wsFolder) {
+	if(fs.existsSync(this.getConfigPath(wsFolder))){
+		var configjson = fs.readFileSync(this.getConfigPath(wsFolder)).toString();
+		var configObject;
 
-    try {
-      configObject = JSON.parse(configjson);
-    } catch (err) {
-      vscode.window.showErrorMessage(
-        "Ftp-sync: Config file is not a valid JSON document. - " + err.message
-      );
-    }
+		try {
+		  configObject = JSON.parse(configjson);
+		} catch (err) {
+		  vscode.window.showErrorMessage(
+			"Ftp-sync: Config file is not a valid JSON document. - " + err.message
+		  );
+		}
+	}
     return _.defaults(configObject, this.defaultConfig);
   },
-  validateConfig: function() {
-    if (!fs.existsSync(this.getConfigPath())) {
+  validateConfig: function(wsFolder) {
+    if (!fs.existsSync(this.getConfigPath(wsFolder))) {
       var options = [
-        "Create ftp-sync config now...",
-        "Nah, forget about it..."
+        "创建FTP配置文件...",
+        "忽略..."
       ];
       var pick = vscode.window.showQuickPick(options, {
-        placeHolder: "No configuration file found. Run Init command first."
+        placeHolder: "还没有配置FTP连接，请先配置"
       });
       pick.then(function(answer) {
-        if (answer == options[0]) require("./init-command")();
+        if (answer == options[0]) require("./init-command")(wsFolder);
       });
       return false;
     }
 
     return true;
   },
-  getSyncConfig: function() {
-    let config = this.getConfig();
+  getSyncConfig: function(wsFolder) {
+    let config = this.getConfig(wsFolder);
     return {
       getGeneratedDir: this.getGeneratedDir,
       local: config.localPath,
@@ -94,8 +97,8 @@ module.exports = {
       rootPath: this.rootPath
     };
   },
-  connectionChanged: function(oldConfig) {
-    var config = this.getSyncConfig();
+  connectionChanged: function(oldConfig,wsFolder) {
+    var config = this.getSyncConfig(wsFolder);
     return (
       config.host != oldConfig.host ||
       config.port != oldConfig.port ||

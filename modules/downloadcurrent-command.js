@@ -7,6 +7,7 @@ var isIgnored = require("./is-ignored");
 module.exports = function(fileUrl, getFtpSync) {
 
 	var filePath = fileUrl ? fileUrl.fsPath : undefined;
+	let workspaceFolder = fileUrl ? fileUrl.workspaceFolder : undefined
 
 	//We aren't getting a file, trying to take the current one
 	if (!filePath) {
@@ -18,17 +19,16 @@ module.exports = function(fileUrl, getFtpSync) {
 		return;
 	}
 
-	if (!ftpconfig.rootPath().fsPath) {
+	if (!ftpconfig.rootPath(workspaceFolder).fsPath) {
 		vscode.window.showErrorMessage("Ftp-sync: Cannot init ftp-sync without opened folder");
 		return;
 	}
-
-	if (filePath.indexOf(ftpconfig.rootPath().fsPath) < 0) {
-		vscode.window.showErrorMessage("Ftp-sync: Selected file is not a part of the workspace.");
-		return;
+	
+	if(!ftpconfig.validateConfig(workspaceFolder)){
+		return ;
 	}
 
-	var config = ftpconfig.getConfig();
+	var config = ftpconfig.getConfig(workspaceFolder);
 	if (isIgnored(filePath, config.allow, config.ignore)) {
 		vscode.window.showErrorMessage("Ftp-sync: Selected file is ignored.");
 		return;
@@ -36,11 +36,15 @@ module.exports = function(fileUrl, getFtpSync) {
 
 	var fileName = path.basename(filePath);
 	var downloadStatus = vscode.window.setStatusBarMessage("Ftp-sync: Downloading " + fileName + " from FTP server...", STATUS_TIMEOUT);
-	getFtpSync().downloadFile(filePath, ftpconfig.rootPath().fsPath, function(err) {
+	getFtpSync(workspaceFolder).downloadFile(filePath, ftpconfig.rootPath(workspaceFolder).fsPath, function(err) {
 		downloadStatus.dispose();
-		if (err)
+		if (err){
 			vscode.window.showErrorMessage("Ftp-sync: Downloading " + fileName + " failed: " + err);
-		else
+		}else{
 			vscode.window.setStatusBarMessage("Ftp-sync: " + fileName + " downloaded successfully!", STATUS_TIMEOUT);
+			if(fileUrl.open){
+				vscode.workspace.openTextDocument(filePath);
+			}
+		}
 	})
 }

@@ -1,7 +1,7 @@
 {
   "name": "ftp-sync",
   "description": "Auto sync your work to remote FTP/SFTP server",
-  "version": "0.4.0",
+  "version": "0.4.0-qualifier",
   "publisher": "lukasz-wronski",
   "engines": {
     "vscode": "^0.10.1"
@@ -23,71 +23,85 @@
     "onCommand:extension.ftpsyncinit",
     "onCommand:extension.ftpsyncupload",
     "onCommand:extension.ftpsyncdownload",
-    "onCommand:extension.ftpsynccommit",
     "onCommand:extension.ftpsyncsingle",
     "onCommand:extension.ftpsyncuploadselected",
     "onCommand:extension.ftpsyncdownloadselected",
-    "workspaceContains:.vscode/ftp-sync.json"
+    "onCommand:extension.ftpsynclistselected",
+    "workspaceContains:.ftp/ftp-sync.json"
   ],
   "main": "./extension",
   "contributes": {
     "commands": [
       {
         "command": "extension.ftpsyncinit",
-        "title": "Ftp-sync: Init"
+        "title": "Ftp-sync: 创建连接配置"
       },
-      {
-        "command": "extension.ftpsyncupload",
-        "title": "Ftp-sync: Local to Remote"
-      },
-      {
-        "command": "extension.ftpsyncdownload",
-        "title": "Ftp-sync: Remote to Local"
-      },
-      {
-        "command": "extension.ftpsynccommit",
-        "title": "Ftp-sync: Commit"
-      },
-      {
-        "command": "extension.ftpsyncsingle",
-        "title": "Ftp-sync: Sync current file to Remote"
-      },
+	  {
+		"command":"extension.ftpsyncsingle",
+		"title":"Ftp-sync: 上传当前文件"
+	  },
       {
         "command": "extension.ftpsyncuploadselected",
-        "title": "Ftp-sync: Upload File"
+        "title": "Ftp-sync: 上传选中文件"
       },
       {
         "command": "extension.ftpsyncdownloadselected",
-        "title": "Ftp-sync: Download File"
+        "title": "Ftp-sync: 下载选中文件"
       },
       {
         "command": "extension.ftpsynclistselected",
-        "title": "Ftp-sync: Browse Remote..."
+        "title": "Ftp-sync: 浏览远程文件..."
       }
     ],
     "menus": {
       "explorer/context": [
+		{
+		  "group": "extension",
+		  "when": "explorerResourceCount == 1 && (!explorerResourceIsFolder || explorerResourceIsWorkspaceFolder)"
+		},
+		{
+		  "command": "extension.ftpsyncinit",
+		  "group": "extension",
+		  "when": "explorerResourceCount == 1 && explorerResourceIsWorkspaceFolder"
+		},
         {
           "command": "extension.ftpsyncuploadselected",
           "group": "extension",
-          "when": "!explorerResourceIsFolder"
+          "when": "explorerResourceCount == 1 && !explorerResourceIsFolder"
         },
         {
           "command": "extension.ftpsyncdownloadselected",
           "group": "extension",
-          "when": "!explorerResourceIsFolder"
+          "when": "explorerResourceCount == 1 && !explorerResourceIsFolder"
         },
         {
           "command": "extension.ftpsynclistselected",
           "group": "extension",
-          "when": "!explorerResourceIsFolder"
+          "when": "explorerResourceCount == 1"
         }
-      ]
+      ],
+	  "editor/context":[
+		{
+		  	"group":"z_commands"
+		},
+	  	{
+	  		"command":"extension.ftpsyncsingle",
+	  		"group":"z_commands",
+			"when":"editorTextFocus"
+	  	},
+		{
+			"group":"z_commands"
+		}
+	  ]
     }
   },
   "devDependencies": {
     "vscode": "0.10.x"
   },
+  "extensionDependencies": [
+  	"npm",
+  	"plugin-manager"
+  ],
   "dependencies": {
     "fs-cp": "^1.3.1",
     "fs-walk": "0.0.1",

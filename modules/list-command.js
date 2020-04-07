@@ -2,6 +2,7 @@
 const vscode = require('vscode');
 const ftpconfig = require('./ftp-config');
 const path = require('path');
+const fs = require('fs')
 const isIgnored = require('./is-ignored');
 const output = require('./output');
 const downloadFn = require('./downloadcurrent-command');
@@ -9,7 +10,7 @@ const uploadFn = require('./uploadcurrent-command');
 
 module.exports = function(fileUrl, getFtpSync) {
 	var filePath = fileUrl ? fileUrl.fsPath : undefined;
-
+	var workspaceFolder = fileUrl ? fileUrl.workspaceFolder : undefined;
 	//We aren't getting a file, trying to take the current one
 	if(!filePath) {
 		filePath = vscode.window.activeTextEditor ? vscode.window.activeTextEditor.document.fileName : undefined;
@@ -20,37 +21,43 @@ module.exports = function(fileUrl, getFtpSync) {
 		return;
 	}
 
-  if (!ftpconfig.rootPath().fsPath) {
+  if (!ftpconfig.rootPath(workspaceFolder).fsPath) {
     vscode.window.showErrorMessage('Ftp-sync: Cannot init ftp-sync without opened folder');
     return;
   }
 
-  if (filePath.indexOf(ftpconfig.rootPath().fsPath) < 0) {
+  if (filePath.indexOf(ftpconfig.rootPath(workspaceFolder).fsPath) < 0) {
     vscode.window.showErrorMessage('Ftp-sync: Selected file is not a part of the workspace.');
     return;
   }
+  
+  if(!ftpconfig.validateConfig(workspaceFolder)){
+  	return ;
+  }
 
-  var config = ftpconfig.getConfig();
+  var config = ftpconfig.getConfig(workspaceFolder);
   if (isIgnored(filePath, config.allow, config.ignore)) {
     vscode.window.showErrorMessage('Ftp-sync: Selected file is ignored.');
     return;
   }
-
-  let remotePath = getFatherPath(filePath.replace(ftpconfig.rootPath().fsPath, config.remotePath));
+  if(fs.statSync(filePath).isDirectory()){
+      filePath = filePath + '/';
+  }
+  let remotePath = getFatherPath(filePath.replace(ftpconfig.rootPath(workspaceFolder).fsPath, config.remotePath));
   function listAllFiles(filesRemotePath) {
-    getFtpSync().ListRemoteFilesByPath(filesRemotePath, function(err, files) {
+    getFtpSync(workspaceFolder).ListRemoteFilesByPath(filesRemotePath, function(err, files) {
       if (err) {
         // console.error('err:', err);
         vscode.window.showErrorMessage('Ftp-sync: Listing failed: ' + err);
       } else {
         vscode.window.setStatusBarMessage('Ftp-sync: Listing successfully!', STATUS_TIMEOUT);
-        // console.log('files:', files);
+        console.log('files:', files);
         showFiles(files, filesRemotePath);
       }
     });
   }
   function deleteFn(filePath) {
-    getFtpSync().deleteRemoteFile(filePath).then(function(result) {
+    getFtpSync(workspaceFolder).deleteRemoteFile(filePath).then(function(result) {
       vscode.window.setStatusBarMessage('Ftp-sync: Delete successfully!', STATUS_TIMEOUT);
     }).catch(err => {
       vscode.window.showErrorMessage('Ftp-sync: Delete failed: ' + err);
@@ -63,10 +70,10 @@ module.exports = function(fileUrl, getFtpSync) {
     const pickResult = vscode.window.showQuickPick([
       {
         label: '../',
-        description: '. UP a folder',
+        description: '回到上一级目录',
         backPath: getFatherPath(filesRemotePath)
       }
-    ].concat(pickOptions), {placeHolder: 'Select a folder or file'});
+    ].concat(pickOptions), {placeHolder: '请选择一个目录或者文件'});
 
     pickResult.then(function(result) {
       if (!result) {
@@ -87,21 +94,21 @@ module.exports = function(fileUrl, getFtpSync) {
     const pickOptions = [
       {
         label: '../',
-        description: '. UP a folder',
+        description: '回到上一级目录',
         backPath: getFatherPath(file.path)
       }, {
-        label: 'DownLoad',
-        description: 'DownLoad this file',
+        label: '打开',
+        description: '打开此文件',
+        file,
+        action: 'open'
+      }, {
+        label: '下载',
+        description: '下载此文件',
         file,
         action: 'download'
       }, {
-        label: 'Upload',
-        description: 'Upload this file',
-        file,
-        action: 'upload'
-      }, {
-        label: 'Delete',
-        description: 'Delete this file',
+        label: '删除',
+        description: '删除此文件',
         file,
         action: 'delete'
       }
@@ -116,9 +123,11 @@ module.exports = function(fileUrl, getFtpSync) {
       if (result.backPath) {
         listAllFiles(result.backPath);
       } else if (result.action === 'download') {
-        downloadFn(getLocalPath(result.file.path), getFtpSync);
-      } else if (result.action === 'upload') {
-        uploadFn(getLocalPath(result.file.path), getFtpSync);
+        downloadFn(getLocalPath(result.file.path,workspaceFolder), getFtpSync);
+      } else if (result.action === 'open') {
+		let localFilePath = getLocalPath(result.file.path,workspaceFolder);
+		localFilePath.open = true;
+		downloadFn(localFilePath, getFtpSync);
       } else if (result.action === 'delete') {
         deleteFn(result.file.path);
       }
@@ -134,9 +143,16 @@ function getLabel(file) {
     : name
 
 }
-function getLocalPath(fileRemotePath) {
+function getLocalPath(fileRemotePath,workspaceFolder) {
+  // console.error("remotePath:" + ftpconfig.getConfig(workspaceFolder).remotePath);
+  // console.error("rootPath:"+  ftpconfig.rootPath(workspaceFolder).fsPath);
+  let fileRemoteRelativePath = fileRemotePath.replace(ftpconfig.getConfig(workspaceFolder).remotePath,"");
+  if(!fileRemoteRelativePath.startsWith("/")){
+	  fileRemoteRelativePath = "/" + fileRemoteRelativePath;
+  }
   return {
-    fsPath: fileRemotePath.replace(ftpconfig.getConfig().remotePath, ftpconfig.rootPath().fsPath)
+    fsPath: ftpconfig.rootPath(workspaceFolder).fsPath + fileRemoteRelativePath,
+	workspaceFolder:workspaceFolder
   };
 }
 function getFatherPath(son) {
