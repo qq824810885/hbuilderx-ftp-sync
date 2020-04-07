@@ -2,7 +2,7 @@
 
 This extension allows you to easily synchronise your local workspace (project files) with an FTP server. It also has several advanced features such as **automatic upload on save**.
 
-![Demo of extension](https://i.imgur.com/W9h4pwW.gif)
+![Demo of extension](https://img-cdn-qiniu.dcloud.net.cn/uploads/article/20200320/60b9e7ebd8edb52696a755ccb0464912.gif)
 
 ## Usage
 
